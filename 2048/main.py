@@ -155,9 +155,10 @@ class Tile:
             game.tileWidth * (x + 0.5) - t.get_width() / 2, game.tileWidth * (y + 0.5) - t.get_height() / 2))
 
 class Board:
-    def __init__(self):
-        self.width = 4
-        self.height = 4
+    def __init__(self, width, height, tileSpawns):
+        self.width = width
+        self.height = height
+        self.tileSpawns = tileSpawns
         self.tiles = []
         self.direction = (0, 0)
         self.end = False
@@ -201,7 +202,7 @@ class Board:
         while len(self.get_tiles_at(x, y)) > 0:
             x = random.randrange(0, self.width)
             y = random.randrange(0, self.height)
-        value = random.choice([2 for i in range(9)] + [4])
+        value = random.choice(self.tileSpawns)
         self.create_tile(x, y, value)
 
     def detect_end(self):
@@ -217,8 +218,8 @@ class Board:
                 self.end = True
 
 class Game:
-    def __init__(self):
-        self.board = Board()
+    def __init__(self, gridWidth, gridHeight, tileSpawns):
+        self.board = Board(gridWidth, gridHeight, tileSpawns)
         self.board.reset()
 
         self.tileWidth = 150
@@ -262,7 +263,7 @@ class Game:
         if self.board.end:
             self.draw_lose()
         t = self.fonts[40].render(f"Score: {self.board.score}", True, (0, 0, 0)).convert_alpha()
-        self.window.blit(t, (10, self.tileWidth*self.board.height+10))
+        self.window.blit(t, (10, self.tileWidth*self.board.height+5))
 
         pygame.display.flip()
 
@@ -287,15 +288,23 @@ class Game:
                 pygame.draw.rect(self.window, (202, 193, 181), (self.tileWidth*x+self.tileSpace/2, self.tileWidth*y+self.tileSpace/2, self.tileWidth-self.tileSpace, self.tileWidth-self.tileSpace))
 
     def add_score(self, name, score):
-        with open("score.json", "r") as f:
-            d = json.load(f)
+        try:
+            with open("score.json", "r") as f:
+                d = json.load(f)
+        except (json.decoder.JSONDecodeError, FileNotFoundError):
+            d = []
         newList = sorted(d + [(name, score)], key=lambda a: a[1], reverse=True)
         with open("score.json", "w") as f:
             json.dump(newList, f)
 
     def get_scores(self):
-        with open("score.json", "r") as f:
-            d = json.load(f)
+        try:
+            with open("score.json", "r") as f:
+                d = json.load(f)
+        except (json.decoder.JSONDecodeError, FileNotFoundError):
+            with open("score.json", "w") as f:
+                json.dump([], f)
+            d = []
         return d
 
     def main(self):
@@ -308,18 +317,22 @@ class Game:
                     run = False
                     break
                 if event.type == pygame.KEYDOWN:
-                    if not self.board.end:
-                        if event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]:
-                            self.queueMove = event.key
-                        if event.key == pygame.K_s:
-                            print(self.get_scores())
-                    else:
-                        self.inputBox.handle_key(event)
                     if event.key == pygame.K_RETURN:
                         if bool(self.inputBox.text) and self.board.score > 0:
                             self.add_score(self.inputBox.text, self.board.score)
                         self.board.reset()
                         self.reset()
+                    if not self.board.end:
+                        if event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]:
+                            self.queueMove = event.key
+                        if event.key == pygame.K_s:
+                            scores = self.get_scores()
+                            newScores = []
+                            for i in scores:
+                                newScores.append(": ".join([str(j) for j in i]))
+                            print("\n".join(["=== Scores ==="]+newScores))
+                    else:
+                        self.inputBox.handle_key(event)
 
             if self.queueMove is not None:
                 if self.animateFrame == -1:
@@ -340,5 +353,5 @@ class Game:
 
         pygame.quit()
 
-g = Game()
+g = Game(2, 2, [2 for i in range(9)] + [4]) # GridWidth(int), GridHeight(int), TileSpawn(list)
 g.main()
